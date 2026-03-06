@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reasonbudget-gym"
+version = "1.0.0"
+description = "OpenEnv RL environment for sequential reasoning budget allocation"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv @ git+https://github.com/meta-pytorch/OpenEnv.git",
+    "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "transformers>=4.36.0",
+    "datasets>=2.14.0",
+    "sentence-transformers>=2.2.0",
+    "sympy>=1.12",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "tqdm>=4.65.0",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "black", "ruff"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["reasonbudget_gym*"]
