@@ -7,8 +7,9 @@ name = "reasonbudget-gym"
 version = "1.0.0"
 description = "OpenEnv RL environment for sequential reasoning budget allocation"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
+    "openenv-core[core]>=0.2.0",
     "openenv @ git+https://github.com/meta-pytorch/OpenEnv.git",
     "numpy>=1.24.0",
     "torch>=2.0.0",
@@ -25,6 +26,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "black", "ruff"]
+
+[project.scripts]
+server = "reasonbudget_gym.server.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

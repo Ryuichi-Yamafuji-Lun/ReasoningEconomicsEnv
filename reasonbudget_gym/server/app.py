@@ -25,3 +25,13 @@ else:
     from fastapi import FastAPI
     app = FastAPI(title="reasonbudget-gym")
     app.get("/health")(lambda: {"status": "ok"})
+
+
+def main():
+    """Entry point for uv run server or python -m."""
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+if __name__ == "__main__":
+    main()

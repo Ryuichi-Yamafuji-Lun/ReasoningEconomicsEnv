@@ -1,0 +1,6 @@
+spec_version: 1
+name: reasonbudget-gym
+type: space
+runtime: fastapi
+app: reasonbudget_gym.server.app:app
+port: 8000

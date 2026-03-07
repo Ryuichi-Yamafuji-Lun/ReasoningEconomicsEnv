@@ -1,0 +1,17 @@
+.git
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+.env
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.plan.md
+outputs
+runs
+*.egg-info
+dist
+build
+.DS_Store
