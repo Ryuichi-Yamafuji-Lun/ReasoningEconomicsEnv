@@ -7,7 +7,7 @@ OpenEnv's generic client with dict actions and observations. Example:
     client = EnvClient(base_url="http://localhost:8000")  # adjust to your server
     obs = client.reset(seed=42)
     while not obs.get("done", False):
-        action = {"budget_allocation": 2}  # tier index 0..4
+        action = {"token_allocation": 350}  # direct token allocation
         obs = client.step(action)
         print(obs.get("reward"), obs.get("done"))
 

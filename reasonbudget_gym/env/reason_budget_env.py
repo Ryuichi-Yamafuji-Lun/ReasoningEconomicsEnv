@@ -3,8 +3,6 @@
 import uuid
 from typing import Optional
 
-import numpy as np
-
 from reasonbudget_gym.env.config import EnvConfig
 from reasonbudget_gym.env.episode_sampler import EpisodeSampler, Question
 from reasonbudget_gym.env.models import ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState
@@ -75,7 +73,8 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         self._solver = None
         self._encoder = None
         self.num_questions = self.config.num_questions
-        self.budget_tiers = self.config.budget_tiers
+        self.min_tokens = self.config.min_tokens
+        self.max_tokens = self.config.max_tokens
         self.total_budget = self.config.get_total_budget()
         self.embedding_dim = 384
         self._episode_id: Optional[str] = None
@@ -160,9 +159,9 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
             obs.reward = 0.0
             obs.done = True
             return obs
-        tier_tokens = self.budget_tiers[action.budget_allocation]
-        spend = min(tier_tokens, self._remaining_budget)
-        if spend < self.budget_tiers[0]:
+        tokens_requested = max(self.min_tokens, min(self.max_tokens, action.token_allocation))
+        spend = min(tokens_requested, self._remaining_budget)
+        if spend < self.min_tokens:
             obs = _obs_from_internals(
                 embeddings=self._embeddings,
                 step_idx=self._step_idx,
@@ -197,7 +196,7 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         })
         self._step_idx += 1
         terminated = self._step_idx >= len(self._questions)
-        truncated = self._remaining_budget < self.budget_tiers[0] and not terminated
+        truncated = self._remaining_budget < self.min_tokens and not terminated
         if truncated and self._step_idx < len(self._questions):
             terminated = True
         obs = _obs_from_internals(

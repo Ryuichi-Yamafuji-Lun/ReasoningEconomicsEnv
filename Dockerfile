@@ -1,4 +1,4 @@
-# Multi-stage build for ReasonBudget-Gym OpenEnv environment.
+# Multi-stage build for ReasoningEconomicsEnv OpenEnv environment.
 # Build context: project root (ReasoningEconomicsEnv/). Copy into /app/env.
 
 ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest

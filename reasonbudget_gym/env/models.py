@@ -15,13 +15,13 @@ except ImportError:
 
 
 class ReasonBudgetAction(_ActionBase):
-    """Action: budget allocation tier index (0..4)."""
+    """Action: direct token allocation for current question."""
 
     if _ActionBase is BaseModel:
         model_config = ConfigDict(extra="forbid")
         metadata: dict[str, Any] = Field(default_factory=dict)
 
-    budget_allocation: int = Field(..., ge=0, description="Index into budget_tiers (0=tiny .. 4=xlarge)")
+    token_allocation: int = Field(..., ge=1, description="Direct token count to allocate")
 
 
 class ReasonBudgetObservation(_ObservationBase):

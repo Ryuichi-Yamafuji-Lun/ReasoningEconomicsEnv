@@ -1,13 +1,13 @@
 ---
-title: ReasonBudget-Gym (ReasoningEconomicsEnv)
+title: ReasoningEconomicsEnv
 sdk: docker
 app_port: 8000
 tags:
   - openenv
-  - reasonbudget-gym
+  - reasoning-economic-env
 ---
 
-# ReasonBudget-Gym (ReasoningEconomicsEnv)
+# ReasoningEconomicsEnv
 
 RL environment for sequential reasoning budget allocation. The project is **OpenEnv-only**: no gymnasium, no stable-baselines3. Baselines and training use `ReasonBudgetObservation` and `ReasonBudgetAction` only.
 
@@ -15,9 +15,9 @@ RL environment for sequential reasoning budget allocation. The project is **Open
 
 - **Core env**: `ReasonBudgetEnvironment` (OpenEnv `Environment` subclass). Use in-process:
   - `obs = env.reset(seed=..., episode_id=...)` → `ReasonBudgetObservation`
-  - `obs = env.step(ReasonBudgetAction(budget_allocation=index))` → `ReasonBudgetObservation` (with `obs.reward`, `obs.done`)
+  - `obs = env.step(ReasonBudgetAction(token_allocation=tokens))` → `ReasonBudgetObservation` (with `obs.reward`, `obs.done`)
   - `state = env.state` → `ReasonBudgetState`
-- **Deployment**: OpenEnv HTTP/WebSocket server in `reasonbudget_gym.server.app`. For remote use, use OpenEnv's generic client with dict actions/observations, e.g. `step({"budget_allocation": 2})`. See `reasonbudget_gym.client` for a short example.
+- **Deployment**: OpenEnv HTTP/WebSocket server in `reasonbudget_gym.server.app`. For remote use, use OpenEnv's generic client with dict actions/observations, e.g. `step({"token_allocation": 350})`. See `reasonbudget_gym.client` for a short example.
 
 ## Install
 
@@ -37,7 +37,7 @@ from reasonbudget_gym.env import (
 env = ReasonBudgetEnvironment(config=EnvConfig(num_questions=10))
 obs = env.reset(seed=42)
 while not obs.done:
-    action = ReasonBudgetAction(budget_allocation=2)  # tier index 0..4
+    action = ReasonBudgetAction(token_allocation=200)
     obs = env.step(action)
     print(obs.reward, obs.done)
 print(env.state.total_correct, env.state.questions_answered)
@@ -65,8 +65,8 @@ To validate and publish this environment as an OpenEnv Space on Hugging Face:
 
 2. **Local container test** — Build and run the image to confirm the API:
    ```bash
-   docker build -t reasonbudget-gym .
-   docker run -p 8000:8000 reasonbudget-gym
+   docker build -t reasoning-economic-env .
+   docker run -p 8000:8000 reasoning-economic-env
    ```
    Then `GET http://localhost:8000/health` and, if desired, a quick reset/step to confirm the env API.
 
@@ -74,9 +74,9 @@ To validate and publish this environment as an OpenEnv Space on Hugging Face:
    ```bash
    openenv push
    ```
-   Optionally: `openenv push --repo-id <org>/reasonbudget-gym` and use `--private` or leave public as needed. Ensure you are logged in (`huggingface-cli login` or set `HF_TOKEN`). If the CLI uses a different flow (e.g. `openenv build` then manual upload), run `openenv build --help` and `openenv push --help` for current options.
+   Optionally: `openenv push --repo-id <org>/reasoning-economic-env` and use `--private` or leave public as needed. Ensure you are logged in (`huggingface-cli login` or set `HF_TOKEN`). If the CLI uses a different flow (e.g. `openenv build` then manual upload), run `openenv build --help` and `openenv push --help` for current options.
 
 ## References
 
-- Implementation plan: see project `ReasonBudget_Gym_Implementation_Plan.md`.
+- Implementation plan: see project `ReasonBudget_Gym_Implementation_Plan.md` (legacy name); ReasoningEconomicsEnv is the current package name.
 - OpenEnv: https://github.com/meta-pytorch/OpenEnv

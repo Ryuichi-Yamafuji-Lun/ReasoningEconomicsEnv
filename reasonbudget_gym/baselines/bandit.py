@@ -1,4 +1,4 @@
-"""LinUCB contextual bandit over budget tiers."""
+"""LinUCB contextual bandit over token-allocation bins."""
 
 import numpy as np
 
@@ -6,20 +6,31 @@ from reasonbudget_gym.env.models import ReasonBudgetObservation
 
 
 class BanditBaseline:
-    """LinUCB over 5 arms; features = question_embedding + budget state."""
+    """LinUCB over token bins; features = question_embedding + budget state."""
 
     def __init__(
         self,
-        budget_tiers: list[int],
+        min_tokens: int,
+        max_tokens: int,
+        num_bins: int = 16,
         embedding_dim: int = 384,
         alpha: float = 1.0,
     ):
-        self.budget_tiers = budget_tiers
-        self.n_arms = len(budget_tiers)
+        self.min_tokens = min_tokens
+        self.max_tokens = max_tokens
+        self.token_bins = np.linspace(min_tokens, max_tokens, num=num_bins).astype(int).tolist()
+        self.n_arms = len(self.token_bins)
         self.d = embedding_dim + 3  # embedding + remaining_budget_norm, q_rem_norm, budget_per_remaining_norm
         self.alpha = alpha
         self.A = [np.eye(self.d) for _ in range(self.n_arms)]
         self.b = [np.zeros(self.d) for _ in range(self.n_arms)]
+
+    def _arm_to_tokens(self, arm_idx: int) -> int:
+        return int(self.token_bins[arm_idx])
+
+    def _tokens_to_arm(self, token_allocation: int) -> int:
+        arr = np.asarray(self.token_bins, dtype=np.int32)
+        return int(np.argmin(np.abs(arr - int(token_allocation))))
 
     def _feature(self, observation: ReasonBudgetObservation) -> np.ndarray:
         emb = np.asarray(observation.question_embedding, dtype=np.float64).ravel()
@@ -45,14 +56,15 @@ class BanditBaseline:
         x = x.reshape(-1, 1)
         ucb = []
         for a in range(self.n_arms):
-            Aa = self.A[a]
+            a_mat = self.A[a]
             ba = self.b[a]
-            theta = np.linalg.solve(Aa, ba)
+            theta = np.linalg.solve(a_mat, ba)
             xt = x.ravel()
             u = theta @ xt
-            bonus = self.alpha * np.sqrt(np.maximum(0, (x.T @ np.linalg.solve(Aa, x))[0, 0]))
+            bonus = self.alpha * np.sqrt(np.maximum(0, (x.T @ np.linalg.solve(a_mat, x))[0, 0]))
             ucb.append(u + bonus)
-        return int(np.argmax(ucb))
+        arm = int(np.argmax(ucb))
+        return self._arm_to_tokens(arm)
 
     def update(
         self,
@@ -64,5 +76,6 @@ class BanditBaseline:
         if x.size != self.d:
             return
         x = x.reshape(-1, 1)
-        self.A[action] += x @ x.T
-        self.b[action] += reward * x.ravel()
+        arm = self._tokens_to_arm(action)
+        self.A[arm] += x @ x.T
+        self.b[arm] += reward * x.ravel()

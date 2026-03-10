@@ -1,4 +1,4 @@
-"""FastAPI app exposing ReasonBudgetEnvironment via OpenEnv create_app."""
+"""FastAPI app exposing ReasoningEconomicsEnv environment via OpenEnv create_app."""
 
 from reasonbudget_gym.env import EnvConfig, ReasonBudgetEnvironment
 from reasonbudget_gym.env.models import ReasonBudgetAction, ReasonBudgetObservation
@@ -19,11 +19,11 @@ if create_app is not None:
         _env_factory,
         ReasonBudgetAction,
         ReasonBudgetObservation,
-        env_name="reasonbudget-gym",
+        env_name="reasoning-economic-env",
     )
 else:
     from fastapi import FastAPI
-    app = FastAPI(title="reasonbudget-gym")
+    app = FastAPI(title="reasoning-economic-env")
     app.get("/health")(lambda: {"status": "ok"})
 
 

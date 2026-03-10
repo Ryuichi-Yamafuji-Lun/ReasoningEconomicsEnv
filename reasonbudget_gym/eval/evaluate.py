@@ -39,7 +39,7 @@ def evaluate_baseline(
                 action = baseline.select_action(obs, difficulty=diff)
             else:
                 action = baseline.select_action(obs)
-            obs = env.step(ReasonBudgetAction(budget_allocation=action))
+            obs = env.step(ReasonBudgetAction(token_allocation=action))
             total_reward += float(obs.reward or 0.0)
             allocations.append(action)
             if name == "bandit":
@@ -66,14 +66,15 @@ def main() -> None:
     config = EnvConfig(num_questions=10, budget_ratio=2.0, seed=args.seed)
     env = ReasonBudgetEnvironment(config=config)
 
-    tiers = config.budget_tiers
+    min_tokens = config.min_tokens
+    max_tokens = config.max_tokens
     all_results = {}
 
     for name, baseline in [
-        ("uniform", UniformBaseline(tiers)),
-        ("greedy_max", GreedyMaxBaseline(tiers)),
-        ("oracle", DifficultyOracleBaseline(tiers)),
-        ("bandit", BanditBaseline(tiers, embedding_dim=384)),
+        ("uniform", UniformBaseline(min_tokens, max_tokens)),
+        ("greedy_max", GreedyMaxBaseline(min_tokens, max_tokens)),
+        ("oracle", DifficultyOracleBaseline(min_tokens, max_tokens)),
+        ("bandit", BanditBaseline(min_tokens, max_tokens, embedding_dim=384)),
     ]:
         res = evaluate_baseline(name, env, baseline, args.n_episodes, args.seed)
         all_results[name] = res

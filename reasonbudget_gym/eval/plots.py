@@ -21,8 +21,8 @@ def budget_accuracy_curve(cache_path: str, output_path: str | None = None) -> No
     entries = load_cache_entries(cache_path)
     tiers = [50, 100, 200, 400, 800]
     # We don't have difficulty in cache keys; aggregate over all questions
-    tier_correct = {t: 0 for t in tiers}
-    tier_total = {t: 0 for t in tiers}
+    tier_correct = dict.fromkeys(tiers, 0)
+    tier_total = dict.fromkeys(tiers, 0)
     for qid, qdata in entries.items():
         for t in tiers:
             key = str(t)
@@ -32,7 +32,7 @@ def budget_accuracy_curve(cache_path: str, output_path: str | None = None) -> No
             if qdata[key].get("was_correct"):
                 tier_correct[t] += 1
     accs = [tier_correct[t] / tier_total[t] if tier_total[t] else 0 for t in tiers]
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     ax.plot(tiers, accs, "o-")
     ax.set_xlabel("Budget (tokens)")
     ax.set_ylabel("Accuracy")
@@ -52,7 +52,7 @@ def agent_comparison(eval_json_path: str, output_path: str | None = None) -> Non
     agents = list(summary.keys())
     means = [summary[a]["accuracy_mean"] for a in agents]
     stds = [summary[a]["accuracy_std"] for a in agents]
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     x = np.arange(len(agents))
     ax.bar(x, means, yerr=stds, capsize=5)
     ax.set_xticks(x)
@@ -71,15 +71,14 @@ def budget_pacing(eval_json_path: str, output_path: str | None = None) -> None:
     with open(eval_json_path) as f:
         data = json.load(f)
     raw = data.get("raw", data)
-    tiers = [50, 100, 200, 400, 800]
-    fig, ax = plt.subplots()
+    _, ax = plt.subplots()
     for agent, runs in raw.items():
         if not runs:
             continue
         max_steps = max(len(r["allocations"]) for r in runs)
         cumulative = np.zeros(max_steps)
         for r in runs:
-            spent = [tiers[a] for a in r["allocations"]]
+            spent = [int(a) for a in r["allocations"]]
             for i, s in enumerate(spent):
                 cumulative[i] += s
         cumulative /= len(runs)
@@ -97,12 +96,10 @@ def budget_pacing(eval_json_path: str, output_path: str | None = None) -> None:
 
 
 def allocation_heatmap(eval_json_path: str, output_path: str | None = None) -> None:
-    """Heatmap: tier (y) vs step (x) for one agent, or average allocation per step."""
+    """Heatmap: token-allocation density (y) vs step (x) for one agent."""
     with open(eval_json_path) as f:
         data = json.load(f)
     raw = data.get("raw", data)
-    tiers = [50, 100, 200, 400, 800]
-    # For uniform agent: average allocation index per step
     agent = "uniform"
     if agent not in raw or not raw[agent]:
         agent = list(raw.keys())[0] if raw else None
@@ -110,16 +107,25 @@ def allocation_heatmap(eval_json_path: str, output_path: str | None = None) -> N
         return
     runs = raw[agent]
     max_steps = max(len(r["allocations"]) for r in runs)
-    grid = np.zeros((len(tiers), max_steps))
-    for r in runs:
-        for step, a in enumerate(r["allocations"]):
-            if a < len(tiers):
-                grid[a, step] += 1
-    grid /= len(runs)
-    fig, ax = plt.subplots()
-    sns.heatmap(grid, xticklabels=range(1, max_steps + 1), yticklabels=tiers, ax=ax)
+    all_allocs = [int(a) for r in runs for a in r["allocations"]]
+    if not all_allocs:
+        return
+    token_min = min(all_allocs)
+    token_max = max(all_allocs)
+    n_token_bins = 20
+    edges = np.linspace(token_min, token_max, n_token_bins + 1)
+    grid = np.zeros((n_token_bins, max_steps))
+    for step in range(max_steps):
+        vals = [int(r["allocations"][step]) for r in runs if step < len(r["allocations"])]
+        if not vals:
+            continue
+        hist, _ = np.histogram(vals, bins=edges)
+        grid[:, step] = hist / len(vals)
+    yticklabels = [int((edges[i] + edges[i + 1]) / 2.0) for i in range(n_token_bins)]
+    _, ax = plt.subplots()
+    sns.heatmap(grid, xticklabels=range(1, max_steps + 1), yticklabels=yticklabels, ax=ax)
     ax.set_xlabel("Step")
-    ax.set_ylabel("Budget tier (tokens)")
+    ax.set_ylabel("Token allocation (bin center)")
     ax.set_title(f"Allocation heatmap ({agent})")
     if output_path:
         plt.savefig(output_path)

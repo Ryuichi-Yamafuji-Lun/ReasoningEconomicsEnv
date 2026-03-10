@@ -86,7 +86,7 @@ def build_cache(
 def main() -> None:
     from reasonbudget_gym.env.episode_sampler import EpisodeSampler
 
-    parser = argparse.ArgumentParser(description="Build response cache for ReasonBudget-Gym")
+    parser = argparse.ArgumentParser(description="Build response cache for ReasoningEconomicsEnv")
     parser.add_argument("--num_questions", type=int, default=500)
     parser.add_argument("--output", type=str, default="data/response_cache.json")
     parser.add_argument("--api_key", type=str, default=os.environ.get("TOGETHER_API_KEY", ""))

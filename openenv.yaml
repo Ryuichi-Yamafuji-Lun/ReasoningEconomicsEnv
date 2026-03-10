@@ -1,5 +1,5 @@
 spec_version: 1
-name: reasonbudget-gym
+name: reasoning-economic-env
 type: space
 runtime: fastapi
 app: reasonbudget_gym.server.app:app

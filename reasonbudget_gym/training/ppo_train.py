@@ -23,7 +23,7 @@ def main() -> None:
         seed=args.seed,
     )
     env = ReasonBudgetEnvironment(config=config)
-    policy = UniformBaseline(config.budget_tiers)
+    policy = UniformBaseline(config.min_tokens, config.max_tokens)
 
     Path(args.output).mkdir(parents=True, exist_ok=True)
     rewards = []
@@ -34,7 +34,7 @@ def main() -> None:
         episode_reward = 0.0
         while not obs.done:
             action = policy.select_action(obs)
-            obs = env.step(ReasonBudgetAction(budget_allocation=action))
+            obs = env.step(ReasonBudgetAction(token_allocation=action))
             episode_reward += float(obs.reward or 0.0)
         state = env.state
         rewards.append(episode_reward)
