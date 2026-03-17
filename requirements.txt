@@ -1,3 +1,6 @@
+uv>=0.1.34
+uvloop>=0.18.0
+
 # OpenEnv: canonical package for building/serving RL environments (create_app, env_server, types, CLI)
 openenv-core[core]>=0.2.0
 

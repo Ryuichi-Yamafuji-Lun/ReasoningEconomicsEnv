@@ -1,6 +1,6 @@
 """Difficulty oracle: knows true difficulty, allocates proportionally (upper-bound heuristic)."""
 
-from reasonbudget_gym.env.models import ReasonBudgetObservation
+from env.models import ReasonBudgetObservation
 
 
 class DifficultyOracleBaseline:

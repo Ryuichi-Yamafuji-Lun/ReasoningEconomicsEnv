@@ -3,9 +3,9 @@
 import argparse
 from pathlib import Path
 
-from reasonbudget_gym.env import EnvConfig, ReasonBudgetEnvironment
-from reasonbudget_gym.env.models import ReasonBudgetAction
-from reasonbudget_gym.baselines import UniformBaseline
+from env import EnvConfig, ReasonBudgetEnvironment
+from env.models import ReasonBudgetAction
+from baselines import UniformBaseline
 
 
 def main() -> None:

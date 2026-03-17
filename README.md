@@ -17,7 +17,7 @@ RL environment for sequential reasoning budget allocation. The project is **Open
   - `obs = env.reset(seed=..., episode_id=...)` → `ReasonBudgetObservation`
   - `obs = env.step(ReasonBudgetAction(token_allocation=tokens))` → `ReasonBudgetObservation` (with `obs.reward`, `obs.done`)
   - `state = env.state` → `ReasonBudgetState`
-- **Deployment**: OpenEnv HTTP/WebSocket server in `reasonbudget_gym.server.app`. For remote use, use OpenEnv's generic client with dict actions/observations, e.g. `step({"token_allocation": 350})`. See `reasonbudget_gym.client` for a short example.
+- **Deployment**: OpenEnv HTTP/WebSocket server in `server.app`. For remote use, use `ReasonBudgetEnvClient` in `client.py` (typed `EnvClient` subclass for `ReasonBudgetAction` / `ReasonBudgetObservation`).
 
 ## Install
 
@@ -28,7 +28,7 @@ pip install -e .
 ## Quick start
 
 ```python
-from reasonbudget_gym.env import (
+from env import (
     EnvConfig,
     ReasonBudgetEnvironment,
     ReasonBudgetAction,
@@ -43,10 +43,12 @@ while not obs.done:
 print(env.state.total_correct, env.state.questions_answered)
 ```
 
+If remote dataset/model downloads are unavailable, the environment now falls back to a small built-in question set and deterministic embeddings so reset/step still work end-to-end.
+
 ## Run server
 
 ```bash
-uvicorn reasonbudget_gym.server.app:app --host 0.0.0.0 --port 8000
+uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
 Or with uv: `uv run server` (from project root).

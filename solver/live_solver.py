@@ -1,6 +1,6 @@
 """Live solver: DeepSeek-R1-Distill-Qwen-7B via transformers (requires GPU)."""
 
-from reasonbudget_gym.solver.base_solver import BaseSolver, SolverResult, grade_answer, extract_boxed_answer
+from solver.base_solver import BaseSolver, SolverResult, grade_answer, extract_boxed_answer
 
 
 class LiveSolver(BaseSolver):

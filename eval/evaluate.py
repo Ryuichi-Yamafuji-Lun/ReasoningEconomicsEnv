@@ -6,9 +6,9 @@ from pathlib import Path
 
 import numpy as np
 
-from reasonbudget_gym.env import EnvConfig, ReasonBudgetEnvironment
-from reasonbudget_gym.env.models import ReasonBudgetAction
-from reasonbudget_gym.baselines import (
+from env import EnvConfig, ReasonBudgetEnvironment
+from env.models import ReasonBudgetAction
+from baselines import (
     UniformBaseline,
     GreedyMaxBaseline,
     DifficultyOracleBaseline,

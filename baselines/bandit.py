@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from reasonbudget_gym.env.models import ReasonBudgetObservation
+from env.models import ReasonBudgetObservation
 
 
 class BanditBaseline:

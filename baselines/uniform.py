@@ -1,6 +1,6 @@
 """Uniform baseline: allocate fair-share tokens directly."""
 
-from reasonbudget_gym.env.models import ReasonBudgetObservation
+from env.models import ReasonBudgetObservation
 
 
 class UniformBaseline:

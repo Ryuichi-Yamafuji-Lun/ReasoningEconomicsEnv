@@ -1,6 +1,6 @@
 """Greedy-max baseline: allocate max that fits in remaining_budget / questions_remaining."""
 
-from reasonbudget_gym.env.models import ReasonBudgetObservation
+from env.models import ReasonBudgetObservation
 
 
 class GreedyMaxBaseline:

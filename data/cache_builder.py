@@ -7,7 +7,7 @@ import random
 import time
 from pathlib import Path
 
-from reasonbudget_gym.solver.base_solver import grade_answer, extract_boxed_answer
+from solver.base_solver import grade_answer, extract_boxed_answer
 
 
 def call_together_api(
@@ -84,7 +84,7 @@ def build_cache(
 
 
 def main() -> None:
-    from reasonbudget_gym.env.episode_sampler import EpisodeSampler
+    from env.episode_sampler import EpisodeSampler
 
     parser = argparse.ArgumentParser(description="Build response cache for ReasoningEconomicsEnv")
     parser.add_argument("--num_questions", type=int, default=500)

@@ -1,7 +1,7 @@
 """FastAPI app exposing ReasoningEconomicsEnv environment via OpenEnv create_app."""
 
-from reasonbudget_gym.env import EnvConfig, ReasonBudgetEnvironment
-from reasonbudget_gym.env.models import ReasonBudgetAction, ReasonBudgetObservation
+from env import EnvConfig, ReasonBudgetEnvironment
+from env.models import ReasonBudgetAction, ReasonBudgetObservation
 
 try:
     from openenv.core.env_server import create_app

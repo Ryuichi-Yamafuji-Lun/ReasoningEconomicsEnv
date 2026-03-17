@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "openenv-core[core]>=0.2.0",
-    "openenv @ git+https://github.com/meta-pytorch/OpenEnv.git",
     "numpy>=1.24.0",
     "torch>=2.0.0",
     "transformers>=4.36.0",
@@ -28,8 +27,8 @@ dependencies = [
 dev = ["pytest", "pytest-cov", "black", "ruff"]
 
 [project.scripts]
-server = "reasonbudget_gym.server.app:main"
+server = "server.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["reasonbudget_gym*"]
+include = ["env*", "baselines*", "data*", "eval*", "policy*", "server*", "solver*", "training*"]

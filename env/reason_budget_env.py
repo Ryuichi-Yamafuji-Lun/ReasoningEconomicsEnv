@@ -1,12 +1,14 @@
 """Core OpenEnv environment: ReasonBudgetEnvironment (reset/step/state)."""
 
+import hashlib
+import random
 import uuid
 from typing import Optional
 
-from reasonbudget_gym.env.config import EnvConfig
-from reasonbudget_gym.env.episode_sampler import EpisodeSampler, Question
-from reasonbudget_gym.env.models import ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState
-from reasonbudget_gym.env.reward import compute_reward
+from env.config import EnvConfig
+from env.episode_sampler import EpisodeSampler, Question
+from env.models import ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState
+from env.reward import compute_reward
 
 try:
     from openenv.core.env_server.interfaces import Environment
@@ -63,6 +65,29 @@ def _obs_from_internals(
     )
 
 
+class _FallbackEncoder:
+    """Deterministic fallback encoder used when sentence-transformers is unavailable."""
+
+    def __init__(self, embedding_dim: int):
+        self.embedding_dim = embedding_dim
+
+    def _embed(self, text: str) -> list[float]:
+        seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
+        rng = random.Random(seed)
+        return [rng.uniform(-1.0, 1.0) for _ in range(self.embedding_dim)]
+
+    def encode(self, texts: list[str], convert_to_numpy: bool = False):
+        embeddings = [self._embed(text) for text in texts]
+        if convert_to_numpy:
+            try:
+                import numpy as np
+
+                return np.asarray(embeddings, dtype=float)
+            except Exception:
+                return embeddings
+        return embeddings
+
+
 class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState]):
     """OpenEnv environment: sequential reasoning budget allocation."""
 
@@ -89,18 +114,22 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         if self._solver is not None:
             return self._solver
         if self.config.use_cache:
-            from reasonbudget_gym.solver.cached_solver import CachedSolver
+            from solver.cached_solver import CachedSolver
             self._solver = CachedSolver(self.config.cache_path)
         else:
-            from reasonbudget_gym.solver.live_solver import LiveSolver
+            from solver.live_solver import LiveSolver
             self._solver = LiveSolver(self.config.solver_model)
         return self._solver
 
     def _get_encoder(self):
         if self._encoder is not None:
             return self._encoder
-        from sentence_transformers import SentenceTransformer
-        self._encoder = SentenceTransformer(self.config.embedding_model)
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            self._encoder = SentenceTransformer(self.config.embedding_model)
+        except Exception:
+            self._encoder = _FallbackEncoder(self.embedding_dim)
         return self._encoder
 
     def reset(

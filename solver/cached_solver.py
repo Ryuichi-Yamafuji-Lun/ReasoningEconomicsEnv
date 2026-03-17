@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from reasonbudget_gym.solver.base_solver import BaseSolver, SolverResult
+from solver.base_solver import BaseSolver, SolverResult
 
 
 class CachedSolver(BaseSolver):

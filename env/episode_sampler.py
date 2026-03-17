@@ -6,7 +6,7 @@ from typing import Optional
 
 from datasets import load_dataset
 
-from reasonbudget_gym.data.difficulty_labels import classify_question
+from data.difficulty_labels import classify_question
 
 
 def _extract_boxed(text: str) -> Optional[str]:
@@ -38,10 +38,36 @@ class EpisodeSampler:
         self._meta_math_by_difficulty: Optional[dict[str, list[Question]]] = None
         self._math_l4_l5: Optional[list[Question]] = None
 
+    def _fallback_questions(self) -> dict[str, list[Question]]:
+        """Small built-in fallback so env can run without network access."""
+        return {
+            "gsm8k": [
+                Question("fallback_gsm8k_1", "What is 12 + 15?", "27", "gsm8k", "fallback"),
+                Question("fallback_gsm8k_2", "If you have 9 apples and buy 6 more, how many apples?", "15", "gsm8k", "fallback"),
+            ],
+            "math_l1_l2": [
+                Question("fallback_l12_1", "Compute 7 * 8.", "56", "math_l1_l2", "fallback"),
+                Question("fallback_l12_2", "Solve for x: x + 11 = 19.", "8", "math_l1_l2", "fallback"),
+            ],
+            "math_l3": [
+                Question("fallback_l3_1", "Solve 2x + 3 = 17.", "7", "math_l3", "fallback"),
+                Question("fallback_l3_2", "What is 3^4?", "81", "math_l3", "fallback"),
+            ],
+            "math_l4_l5": [
+                Question("fallback_l45_1", "Compute the derivative of x^2.", "2x", "math_l4_l5", "fallback"),
+                Question("fallback_l45_2", "Evaluate the integral of 2x dx.", "x^2 + C", "math_l4_l5", "fallback"),
+            ],
+        }
+
     def _load_meta_math(self) -> dict[str, list[Question]]:
         if self._meta_math_by_difficulty is not None:
             return self._meta_math_by_difficulty
-        ds = load_dataset("meta-math/MetaMathQA", "default", split="train", trust_remote_code=True)
+        try:
+            ds = load_dataset("meta-math/MetaMathQA", "default", split="train")
+        except Exception:
+            self._meta_math_by_difficulty = self._fallback_questions()
+            self._math_l4_l5 = []
+            return self._meta_math_by_difficulty
         by_diff: dict[str, list[Question]] = {
             "gsm8k": [],
             "math_l1_l2": [],
@@ -72,7 +98,6 @@ class EpisodeSampler:
                 "EleutherAI/hendrycks_math",
                 "all",
                 split="train",
-                trust_remote_code=True,
             )
         except Exception:
             self._math_l4_l5 = []
@@ -140,7 +165,7 @@ class EpisodeSampler:
                     if total >= num_questions:
                         break
         if total > num_questions:
-            for diff in list(counts.keys()):
+            for diff in counts:
                 if counts[diff] > 0 and total > num_questions:
                     counts[diff] -= 1
                     total -= 1
@@ -150,6 +175,11 @@ class EpisodeSampler:
             pool = by_diff.get(diff, [])
             if not pool or n <= 0:
                 continue
-            chosen.extend(rng.sample(pool, min(n, len(pool))))
+            if n <= len(pool):
+                chosen.extend(rng.sample(pool, n))
+            else:
+                chosen.extend(rng.sample(pool, len(pool)))
+                # Keep episode length stable when fallback pools are tiny.
+                chosen.extend(rng.choices(pool, k=n - len(pool)))
         rng.shuffle(chosen)
         return chosen[:num_questions]

@@ -1,0 +1,68 @@
+{
+  "entries": {
+    "fallback_gsm8k_1": {
+      "200": {
+        "answer": "27",
+        "tokens_used": 156,
+        "was_correct": true,
+        "response_text": "12 + 15 = 27"
+      }
+    },
+    "fallback_gsm8k_2": {
+      "200": {
+        "answer": "15",
+        "tokens_used": 149,
+        "was_correct": true,
+        "response_text": "9 + 6 = 15"
+      }
+    },
+    "fallback_l12_1": {
+      "200": {
+        "answer": "56",
+        "tokens_used": 143,
+        "was_correct": true,
+        "response_text": "7 * 8 = 56"
+      }
+    },
+    "fallback_l12_2": {
+      "200": {
+        "answer": "8",
+        "tokens_used": 140,
+        "was_correct": true,
+        "response_text": "x = 19 - 11 = 8"
+      }
+    },
+    "fallback_l3_1": {
+      "200": {
+        "answer": "7",
+        "tokens_used": 161,
+        "was_correct": true,
+        "response_text": "2x + 3 = 17 => 2x = 14 => x = 7"
+      }
+    },
+    "fallback_l3_2": {
+      "200": {
+        "answer": "81",
+        "tokens_used": 132,
+        "was_correct": true,
+        "response_text": "3^4 = 81"
+      }
+    },
+    "fallback_l45_1": {
+      "200": {
+        "answer": "2x",
+        "tokens_used": 171,
+        "was_correct": true,
+        "response_text": "d/dx (x^2) = 2x"
+      }
+    },
+    "fallback_l45_2": {
+      "200": {
+        "answer": "x^2 + C",
+        "tokens_used": 176,
+        "was_correct": true,
+        "response_text": "Integral of 2x is x^2 + C"
+      }
+    }
+  }
+}
