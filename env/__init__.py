@@ -1,21 +1,23 @@
-"""Environment: config, reward, and OpenEnv core env (no gymnasium)."""
+"""Environment: config, reward, grading, and OpenEnv core env."""
 
 from env.config import EnvConfig
-from env.reward import compute_reward
-from env.reason_budget_env import ReasonBudgetEnvironment, ReasonBudgetEnv
+from env.grading import extract_boxed_answer, grade_answer
 from env.models import (
     ReasonBudgetAction,
     ReasonBudgetObservation,
     ReasonBudgetState,
 )
+from env.reason_budget_env import ReasonBudgetEnvironment
+from env.reward import compute_episode_bonus, compute_reward
 
 __all__ = [
     "EnvConfig",
     "compute_reward",
+    "compute_episode_bonus",
+    "extract_boxed_answer",
+    "grade_answer",
     "ReasonBudgetEnvironment",
-    "ReasonBudgetEnv",
     "ReasonBudgetAction",
     "ReasonBudgetObservation",
     "ReasonBudgetState",
 ]
-

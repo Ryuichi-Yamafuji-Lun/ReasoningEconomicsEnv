@@ -1,185 +1,143 @@
-"""Episode sampler: load MetaMathQA, difficulty stratification, and optional MATH L4-L5 supplement."""
+"""Episode sampling: even mix across MetaMathQA problem types + NuminaMath-TIR."""
 
-import re
-from dataclasses import dataclass
+from __future__ import annotations
+
+import random
 from typing import Optional
 
-from datasets import load_dataset
+from data.loaders import (
+    METAMATHQA_PROBLEM_TYPES,
+    NUMINA_PROBLEM_TYPE,
+    load_metamathqa_by_type,
+    load_numinamath_tir,
+)
+from data.question import Question
 
-from data.difficulty_labels import classify_question
-
-
-def _extract_boxed(text: str) -> Optional[str]:
-    """Extract content of last \\boxed{...} in text, or None."""
-    if not text:
-        return None
-    matches = re.findall(r"\\boxed\{([^}]*)\}", text)
-    if matches:
-        return matches[-1].strip()
-    return None
+ALL_MIX_TYPES: tuple[str, ...] = (*METAMATHQA_PROBLEM_TYPES, NUMINA_PROBLEM_TYPE)
 
 
-@dataclass
-class Question:
-    """Single question in an episode."""
-
-    id: str
-    text: str
-    answer: str
-    difficulty: str
-    source: str
+def _even_type_counts(
+    num_questions: int,
+    active_types: list[str],
+    rng: random.Random,
+):
+    """Split `num_questions` across `active_types` as evenly as possible."""
+    k = len(active_types)
+    if k == 0 or num_questions <= 0:
+        return []
+    types = list(active_types)
+    rng.shuffle(types)
+    if num_questions <= k:
+        return [(t, 1) for t in rng.sample(types, num_questions)]
+    base, rem = divmod(num_questions, k)
+    out: list[tuple[str, int]] = []
+    for i, t in enumerate(types):
+        c = base + (1 if i < rem else 0)
+        out.append((t, c))
+    return out
 
 
 class EpisodeSampler:
-    """Samples episodes from MetaMathQA with optional MATH L4-L5 supplement."""
+    """Samples episodes with an even mix of MetaMathQA `type` values + NuminaMath-TIR."""
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        *,
+        prod: bool = False,
+        subset_start_idx: int = 0,
+        subset_size: int = 500,
+        numina_subset_start_idx: int = 0,
+        numina_subset_size: int = 500,
+    ):
         self._seed = seed
-        self._meta_math_by_difficulty: Optional[dict[str, list[Question]]] = None
-        self._math_l4_l5: Optional[list[Question]] = None
+        self._prod = prod
+        self._subset_start_idx = max(0, int(subset_start_idx))
+        self._subset_size = max(1, int(subset_size))
+        self._numina_subset_start_idx = max(0, int(numina_subset_start_idx))
+        self._numina_subset_size = max(1, int(numina_subset_size))
+        self._pools: Optional[dict[str, list[Question]]] = None
 
-    def _fallback_questions(self) -> dict[str, list[Question]]:
-        """Small built-in fallback so env can run without network access."""
-        return {
-            "gsm8k": [
-                Question("fallback_gsm8k_1", "What is 12 + 15?", "27", "gsm8k", "fallback"),
-                Question("fallback_gsm8k_2", "If you have 9 apples and buy 6 more, how many apples?", "15", "gsm8k", "fallback"),
+    def _fallback_pools(self):
+        """Tiny offline pools (one row per type) when HF load fails."""
+        fb: dict[str, list[Question]] = {
+            "MATH_AnsAug": [
+                Question("fb_ma", "Compute 1+1.", "2", "MATH_AnsAug", "fallback"),
             ],
-            "math_l1_l2": [
-                Question("fallback_l12_1", "Compute 7 * 8.", "56", "math_l1_l2", "fallback"),
-                Question("fallback_l12_2", "Solve for x: x + 11 = 19.", "8", "math_l1_l2", "fallback"),
+            "GSM_Rephrased": [
+                Question("fb_gr", "What is 3*4?", "12", "GSM_Rephrased", "fallback"),
             ],
-            "math_l3": [
-                Question("fallback_l3_1", "Solve 2x + 3 = 17.", "7", "math_l3", "fallback"),
-                Question("fallback_l3_2", "What is 3^4?", "81", "math_l3", "fallback"),
+            "GSM_SV": [
+                Question("fb_gsv", "What is 10-3?", "7", "GSM_SV", "fallback"),
             ],
-            "math_l4_l5": [
-                Question("fallback_l45_1", "Compute the derivative of x^2.", "2x", "math_l4_l5", "fallback"),
-                Question("fallback_l45_2", "Evaluate the integral of 2x dx.", "x^2 + C", "math_l4_l5", "fallback"),
+            "GSM_FOBAR": [
+                Question("fb_gf", "What is 8/2?", "4", "GSM_FOBAR", "fallback"),
+            ],
+            "GSM_AnsAug": [
+                Question("fb_ga", "What is 5+6?", "11", "GSM_AnsAug", "fallback"),
+            ],
+            "MATH_FOBAR": [
+                Question("fb_mf", "What is 9^2?", "81", "MATH_FOBAR", "fallback"),
+            ],
+            "MATH_Rephrased": [
+                Question("fb_mr", "Solve x if x+2=5.", "3", "MATH_Rephrased", "fallback"),
+            ],
+            "MATH_SV": [
+                Question("fb_ms", "What is sqrt(16)?", "4", "MATH_SV", "fallback"),
+            ],
+            NUMINA_PROBLEM_TYPE: [
+                Question("fb_nm", "What is 2^3?", "8", NUMINA_PROBLEM_TYPE, "fallback"),
             ],
         }
+        return fb
 
-    def _load_meta_math(self) -> dict[str, list[Question]]:
-        if self._meta_math_by_difficulty is not None:
-            return self._meta_math_by_difficulty
+    def _load_pools(self):
+        if self._pools is not None:
+            return self._pools
         try:
-            ds = load_dataset("meta-math/MetaMathQA", "default", split="train")
+            meta = load_metamathqa_by_type(
+                prod=self._prod,
+                subset_start_idx=self._subset_start_idx,
+                subset_size=self._subset_size,
+            )
+            numina = load_numinamath_tir(
+                prod=self._prod,
+                subset_start_idx=self._numina_subset_start_idx,
+                subset_size=self._numina_subset_size,
+            )
+            pools: dict[str, list[Question]] = {}
+            for t in METAMATHQA_PROBLEM_TYPES:
+                if meta.get(t):
+                    pools[t] = list(meta[t])
+            if numina:
+                pools[NUMINA_PROBLEM_TYPE] = numina
+            self._pools = pools if pools else self._fallback_pools()
         except Exception:
-            self._meta_math_by_difficulty = self._fallback_questions()
-            self._math_l4_l5 = []
-            return self._meta_math_by_difficulty
-        by_diff: dict[str, list[Question]] = {
-            "gsm8k": [],
-            "math_l1_l2": [],
-            "math_l3": [],
-            "math_l4_l5": [],
-        }
-        for i, row in enumerate(ds):
-            qid = f"metamath_{i}"
-            query = row.get("query") or row.get("question", "")
-            response = row.get("response", "")
-            answer = _extract_boxed(response)
-            if not answer:
-                answer = response.strip().split("\n")[-1] if response else ""
-            diff = classify_question(dict(row))
-            if diff not in by_diff:
-                by_diff[diff] = []
-            by_diff[diff].append(
-                Question(id=qid, text=query, answer=answer, difficulty=diff, source="metamath")
-            )
-        self._meta_math_by_difficulty = by_diff
-        return self._meta_math_by_difficulty
-
-    def _load_math_l4_l5(self) -> list[Question]:
-        if self._math_l4_l5 is not None:
-            return self._math_l4_l5
-        try:
-            ds = load_dataset(
-                "EleutherAI/hendrycks_math",
-                "all",
-                split="train",
-            )
-        except Exception:
-            self._math_l4_l5 = []
-            return self._math_l4_l5
-        out = []
-        for i, row in enumerate(ds):
-            level = row.get("level")
-            if level is None:
-                continue
-            try:
-                l = int(level)
-            except (TypeError, ValueError):
-                continue
-            if l < 4:
-                continue
-            problem = row.get("problem", "")
-            solution = row.get("solution", "")
-            answer = _extract_boxed(solution)
-            if not answer:
-                answer = solution.strip().split("\n")[-1] if solution else ""
-            diff = "math_l4_l5"
-            out.append(
-                Question(
-                    id=f"math_l45_{i}",
-                    text=problem,
-                    answer=answer,
-                    difficulty=diff,
-                    source="hendrycks_math",
-                )
-            )
-        self._math_l4_l5 = out
-        return self._math_l4_l5
+            self._pools = self._fallback_pools()
+        return self._pools
 
     def sample_episode(
         self,
         num_questions: int,
-        difficulty_mix: dict[str, float],
         seed: Optional[int] = None,
-    ) -> list[Question]:
-        """Sample num_questions questions according to difficulty_mix.
-
-        difficulty_mix: e.g. {'gsm8k': 0.3, 'math_l1_l2': 0.2, 'math_l3': 0.2, 'math_l4_l5': 0.3}
-        """
-        import random
-
+    ):
+        """Sample `num_questions` with an even split across available problem types."""
         rng = random.Random(seed if seed is not None else self._seed)
-        by_diff = self._load_meta_math()
-        math_l45 = self._load_math_l4_l5()
-        if math_l45:
-            by_diff["math_l4_l5"] = list(by_diff.get("math_l4_l5", [])) + math_l45
+        pools = self._load_pools()
+        active = [t for t in ALL_MIX_TYPES if pools.get(t)]
+        if not active:
+            return []
 
-        counts = {}
-        for diff, frac in difficulty_mix.items():
-            if frac <= 0:
-                continue
-            n = max(0, int(round(num_questions * frac)))
-            if n > 0 and diff in by_diff and by_diff[diff]:
-                counts[diff] = n
-        total = sum(counts.values())
-        if total < num_questions:
-            for diff in difficulty_mix:
-                if diff not in counts and diff in by_diff and by_diff[diff]:
-                    counts[diff] = counts.get(diff, 0) + 1
-                    total += 1
-                    if total >= num_questions:
-                        break
-        if total > num_questions:
-            for diff in counts:
-                if counts[diff] > 0 and total > num_questions:
-                    counts[diff] -= 1
-                    total -= 1
-
-        chosen = []
-        for diff, n in counts.items():
-            pool = by_diff.get(diff, [])
+        counts = _even_type_counts(num_questions, active, rng)
+        chosen: list[Question] = []
+        for ptype, n in counts:
+            pool = pools[ptype]
             if not pool or n <= 0:
                 continue
             if n <= len(pool):
                 chosen.extend(rng.sample(pool, n))
             else:
                 chosen.extend(rng.sample(pool, len(pool)))
-                # Keep episode length stable when fallback pools are tiny.
                 chosen.extend(rng.choices(pool, k=n - len(pool)))
         rng.shuffle(chosen)
         return chosen[:num_questions]

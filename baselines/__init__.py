@@ -1,13 +1,19 @@
-"""Baselines: uniform, greedy, oracle, and bandit agents."""
+"""Baselines: dummy deterministic and LLM-backed strategies."""
 
-from baselines.uniform import UniformBaseline
-from baselines.greedy_max import GreedyMaxBaseline
-from baselines.difficulty_oracle import DifficultyOracleBaseline
-from baselines.bandit import BanditBaseline
+from baselines.dummy import (
+    UniformBaseline,
+    GreedyMaxBaseline,
+    DifficultyOracleBaseline,
+)
+from baselines.llm import (
+    APIChatBaseline,
+    LocalVLLMBaseline,
+)
 
 __all__ = [
     "UniformBaseline",
     "GreedyMaxBaseline",
     "DifficultyOracleBaseline",
-    "BanditBaseline",
+    "APIChatBaseline",
+    "LocalVLLMBaseline",
 ]

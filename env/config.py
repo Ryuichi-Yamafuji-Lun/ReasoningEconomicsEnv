@@ -1,6 +1,6 @@
-"""Environment configuration (EnvConfig) per Section 2.1 of the implementation plan."""
+"""Environment configuration (EnvConfig) for v2 post-training RL environment."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -8,26 +8,32 @@ from typing import Optional
 class EnvConfig:
     """Fully configurable episode and environment parameters."""
 
+    # If True, run full experiment settings. If False, run baby test settings.
+    prod: bool = False
+    # Baby-test subset window on MetaMathQA: [subset_start_idx, subset_start_idx + subset_size)
+    subset_start_idx: int = 0
+    subset_size: int = 500
+    # Same indexing for NuminaMath-TIR baby runs
+    numina_subset_start_idx: int = 0
+    numina_subset_size: int = 500
+
+    # Budget policy: hard-cap preserves existing clipping/early-stop behavior.
+    hard_cap_mode: bool = True
+    # Soft-budget controls (used when hard_cap_mode=False).
+    soft_allow_negative_budget: bool = True
+    soft_overspend_penalty: float = 0.25
+
     num_questions: int = 10
     total_budget: Optional[int] = None
     budget_ratio: float = 2.0
-    difficulty_mix: dict = field(
-        default_factory=lambda: {
-            "gsm8k": 0.3,
-            "math_l1_l2": 0.2,
-            "math_l3": 0.2,
-            "math_l4_l5": 0.3,
-        }
-    )
-    action_space: str = "continuous"
     min_tokens: int = 10
     max_tokens: int = 800
-    solver_model: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-    use_cache: bool = True
-    cache_path: str = "data/response_cache.json"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    max_tokens_per_step: int = 2048
+    tokenizer_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
     beta: float = 0.05
     gamma: float = 0.1
+    lambda_ep: float = 0.5
+    target_utilization: float = 0.9
     seed: Optional[int] = None
 
     def get_total_budget(self) -> int:

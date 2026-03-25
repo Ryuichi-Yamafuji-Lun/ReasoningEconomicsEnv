@@ -1,4 +1,4 @@
-"""Typed OpenEnv client for the ReasonBudget environment."""
+"""Typed OpenEnv client for the ReasonBudget environment (v2)."""
 
 from typing import Any, Dict
 
@@ -26,7 +26,7 @@ class ReasonBudgetEnvClient(
 
     def _step_payload(self, action: ReasonBudgetAction) -> Dict[str, Any]:
         """Convert a typed action to the step payload."""
-        return {"token_allocation": action.token_allocation}
+        return {"response": action.response}
 
     def _parse_result(self, payload: Dict[str, Any]) -> StepResult[ReasonBudgetObservation]:
         """Parse server step/reset payload to a typed StepResult."""
@@ -36,7 +36,6 @@ class ReasonBudgetEnvClient(
         done = payload.get("done", obs_data.get("done", False))
         reward = payload.get("reward", obs_data.get("reward"))
         observation = ReasonBudgetObservation(
-            question_embedding=obs_data.get("question_embedding", []),
             remaining_budget=obs_data.get("remaining_budget", 0.0),
             questions_remaining=obs_data.get("questions_remaining", 0),
             step_idx=obs_data.get("step_idx", 0),

@@ -1,5 +1,6 @@
-spec_version: 1
+version: "1.0.0""
 name: reasoning-economic-env
+description: "RL environment for sequential reasoning budget allocation"
 type: space
 runtime: fastapi
 app: server.app:app

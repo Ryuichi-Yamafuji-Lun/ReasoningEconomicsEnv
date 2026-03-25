@@ -1,5 +1,17 @@
-"""Data: difficulty labels, cache builder, and episode data utilities."""
+"""Data: dataset loaders and question types."""
 
-from data.difficulty_labels import classify_question
+from data.loaders import (
+    METAMATHQA_PROBLEM_TYPES,
+    NUMINA_PROBLEM_TYPE,
+    load_metamathqa_by_type,
+    load_numinamath_tir,
+)
+from data.question import Question
 
-__all__ = ["classify_question"]
+__all__ = [
+    "METAMATHQA_PROBLEM_TYPES",
+    "NUMINA_PROBLEM_TYPE",
+    "Question",
+    "load_metamathqa_by_type",
+    "load_numinamath_tir",
+]

@@ -15,17 +15,17 @@ except ImportError:
 
 
 class ReasonBudgetAction(_ActionBase):
-    """Action: direct token allocation for current question."""
+    """Action: LLM's full text output (reasoning trace + answer)."""
 
     if _ActionBase is BaseModel:
         model_config = ConfigDict(extra="forbid")
         metadata: dict[str, Any] = Field(default_factory=dict)
 
-    token_allocation: int = Field(..., ge=1, description="Direct token count to allocate")
+    response: str = Field(..., description="LLM's full text output (reasoning trace + answer)")
 
 
 class ReasonBudgetObservation(_ObservationBase):
-    """Observation: question embedding, budget state, and step result (reward, done)."""
+    """Observation: question text, budget state, history, and step result (reward, done)."""
 
     if _ObservationBase is BaseModel:
         model_config = ConfigDict(extra="forbid")
@@ -33,13 +33,12 @@ class ReasonBudgetObservation(_ObservationBase):
         reward: float | None = Field(default=None)
         metadata: dict[str, Any] = Field(default_factory=dict)
 
-    question_embedding: list[float] = Field(..., description="Frozen encoder embedding (e.g. 384-dim)")
-    remaining_budget: float = Field(..., ge=0, description="Tokens remaining in episode budget")
+    remaining_budget: float = Field(..., description="Tokens remaining in episode budget")
     questions_remaining: int = Field(..., ge=0, description="Questions left in episode")
     step_idx: int = Field(..., ge=0, description="Current step index")
-    budget_per_remaining: float = Field(..., ge=0, description="remaining_budget / questions_remaining")
+    budget_per_remaining: float = Field(..., description="remaining_budget / questions_remaining")
     accuracy_so_far: float = Field(..., ge=0, le=1, description="Fraction of correct answers so far")
-    question: str = Field(default="", description="Raw question text (optional)")
+    question: str = Field(default="", description="Current math question text")
     history: list[dict[str, Any]] = Field(default_factory=list, description="Past step summaries")
 
 

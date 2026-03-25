@@ -4,6 +4,10 @@ __pycache__
 *$py.class
 .venv
 venv
+ree-venv
+env
+ENV
+*.venv
 .env
 .pytest_cache
 .ruff_cache
@@ -15,3 +19,20 @@ runs
 dist
 build
 .DS_Store
+
+# Caches & large local artifacts (build context)
+.cache
+.huggingface
+.torch
+wandb
+lightning_logs
+checkpoints
+.ipynb_checkpoints
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+eval_results.json
+pip-wheel-metadata

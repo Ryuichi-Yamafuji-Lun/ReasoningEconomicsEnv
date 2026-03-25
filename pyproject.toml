@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reasoning-economic-env"
-version = "1.0.0"
-description = "OpenEnv RL environment for sequential reasoning budget allocation"
+version = "2.0.0"
+description = "OpenEnv RL environment for post-training LLMs on sequential reasoning budget allocation"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,13 +14,13 @@ dependencies = [
     "torch>=2.0.0",
     "transformers>=4.36.0",
     "datasets>=2.14.0",
-    "sentence-transformers>=2.2.0",
     "sympy>=1.12",
     "matplotlib>=3.7.0",
     "seaborn>=0.12.0",
     "tqdm>=4.65.0",
-    "openai>=1.0.0",
     "pydantic>=2.0.0",
+    "trl>=0.12.0",
+    "vllm>=0.6.0",
 ]
 
 [project.optional-dependencies]
@@ -31,4 +31,4 @@ server = "server.app:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["env*", "baselines*", "data*", "eval*", "policy*", "server*", "solver*", "training*"]
+include = ["env*", "baselines*", "data*", "eval*", "server*", "training*"]

@@ -1,1 +1,49 @@
 .DS_Store
+
+# Virtual environments (keep local; never commit or upload)
+.venv/
+venv/
+ree-venv/
+env/
+ENV/
+env.bak/
+*.venv/
+
+# HuggingFace / PyTorch / pip caches (can be huge)
+.cache/
+.huggingface/
+.torch/
+pip-wheel-metadata/
+
+# ML weights & checkpoints (if present under the repo)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Experiment / notebook artifacts
+wandb/
+lightning_logs/
+checkpoints/
+.ipynb_checkpoints/
+
+# Python / IDE
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+outputs/
+runs/
+*.plan.md
+.coverage
+htmlcov/
+
+# Local eval dumps (can grow large)
+eval_results.json

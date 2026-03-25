@@ -1,23 +1,30 @@
-"""Core OpenEnv environment: ReasonBudgetEnvironment (reset/step/state)."""
+"""Core OpenEnv environment: ReasonBudgetEnvironment (reset/step/state).
 
-import hashlib
-import random
+v2: The environment is a grader, not a solver-wrapper. It receives the LLM's
+text output, tokenizes it, extracts and grades the answer, and returns rewards.
+The LLM call happens in rollout_func, not here.
+"""
+
 import uuid
 from typing import Optional
 
 from env.config import EnvConfig
-from env.episode_sampler import EpisodeSampler, Question
+from data.question import Question
+from env.episode_sampler import EpisodeSampler
+from env.grading import extract_boxed_answer, grade_answer
 from env.models import ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState
-from env.reward import compute_reward
+from env.reward import compute_episode_bonus, compute_reward
 
 try:
     from openenv.core.env_server.interfaces import Environment
 except ImportError:
     from abc import ABC, abstractmethod
     from typing import Generic, TypeVar
+
     ActT = TypeVar("ActT")
     ObsT = TypeVar("ObsT")
     StateT = TypeVar("StateT")
+
     class Environment(ABC, Generic[ActT, ObsT, StateT]):
         @abstractmethod
         def reset(self, seed=None, episode_id=None, **kwargs): ...
@@ -30,29 +37,23 @@ except ImportError:
 
 def _obs_from_internals(
     *,
-    embeddings: list,
     step_idx: int,
     questions: list,
     remaining_budget: int,
     total_correct: int,
     history: list,
-    embedding_dim: int = 384,
 ) -> ReasonBudgetObservation:
+    """Build an observation dict from internal episode state."""
     if step_idx >= len(questions):
         q_rem = 0
-        emb = [0.0] * embedding_dim
         budget_per = 0.0
         question_text = ""
     else:
         q_rem = len(questions) - step_idx
-        emb = embeddings[step_idx].tolist() if hasattr(embeddings[step_idx], "tolist") else list(embeddings[step_idx])
-        if len(emb) != embedding_dim:
-            emb = list(emb)[:embedding_dim] + [0.0] * (embedding_dim - len(emb))
         budget_per = remaining_budget / q_rem if q_rem > 0 else 0.0
-        question_text = questions[step_idx].text if step_idx < len(questions) else ""
+        question_text = questions[step_idx].text
     acc = total_correct / step_idx if step_idx > 0 else 0.0
     return ReasonBudgetObservation(
-        question_embedding=emb,
         remaining_budget=float(remaining_budget),
         questions_remaining=q_rem,
         step_idx=step_idx,
@@ -65,72 +66,60 @@ def _obs_from_internals(
     )
 
 
-class _FallbackEncoder:
-    """Deterministic fallback encoder used when sentence-transformers is unavailable."""
+class ReasonBudgetEnvironment(
+    Environment[ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState]
+):
+    """OpenEnv environment: sequential reasoning budget allocation (v2).
 
-    def __init__(self, embedding_dim: int):
-        self.embedding_dim = embedding_dim
-
-    def _embed(self, text: str) -> list[float]:
-        seed = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
-        rng = random.Random(seed)
-        return [rng.uniform(-1.0, 1.0) for _ in range(self.embedding_dim)]
-
-    def encode(self, texts: list[str], convert_to_numpy: bool = False):
-        embeddings = [self._embed(text) for text in texts]
-        if convert_to_numpy:
-            try:
-                import numpy as np
-
-                return np.asarray(embeddings, dtype=float)
-            except Exception:
-                return embeddings
-        return embeddings
-
-
-class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObservation, ReasonBudgetState]):
-    """OpenEnv environment: sequential reasoning budget allocation."""
+    The environment serves math questions, tokenizes the LLM's response to
+    count tokens_used, extracts and grades the answer, and returns per-step
+    rewards plus an episode-level bonus on the final step.
+    """
 
     def __init__(self, config: Optional[EnvConfig] = None, **kwargs):
         super().__init__(**kwargs)
         self.config = config or EnvConfig()
-        self._sampler = EpisodeSampler(seed=self.config.seed)
-        self._solver = None
-        self._encoder = None
+        self._sampler = EpisodeSampler(
+            seed=self.config.seed,
+            prod=self.config.prod,
+            subset_start_idx=self.config.subset_start_idx,
+            subset_size=self.config.subset_size,
+            numina_subset_start_idx=self.config.numina_subset_start_idx,
+            numina_subset_size=self.config.numina_subset_size,
+        )
+        self._tokenizer = None
         self.num_questions = self.config.num_questions
         self.min_tokens = self.config.min_tokens
         self.max_tokens = self.config.max_tokens
         self.total_budget = self.config.get_total_budget()
-        self.embedding_dim = 384
+
         self._episode_id: Optional[str] = None
         self._questions: list[Question] = []
-        self._embeddings: list = []
         self._step_idx: int = 0
         self._remaining_budget: int = 0
         self._history: list[dict] = []
         self._total_correct: int = 0
 
-    def _get_solver(self):
-        if self._solver is not None:
-            return self._solver
-        if self.config.use_cache:
-            from solver.cached_solver import CachedSolver
-            self._solver = CachedSolver(self.config.cache_path)
-        else:
-            from solver.live_solver import LiveSolver
-            self._solver = LiveSolver(self.config.solver_model)
-        return self._solver
-
-    def _get_encoder(self):
-        if self._encoder is not None:
-            return self._encoder
+    def _get_tokenizer(self):
+        if self._tokenizer is not None:
+            return self._tokenizer
         try:
-            from sentence_transformers import SentenceTransformer
+            from transformers import AutoTokenizer
 
-            self._encoder = SentenceTransformer(self.config.embedding_model)
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                self.config.tokenizer_name, trust_remote_code=True
+            )
         except Exception:
-            self._encoder = _FallbackEncoder(self.embedding_dim)
-        return self._encoder
+            self._tokenizer = None
+        return self._tokenizer
+
+    def _count_tokens(self, text: str) -> int:
+        """Count tokens in text using the LLM's tokenizer, or approximate by whitespace."""
+        tokenizer = self._get_tokenizer()
+        if tokenizer is not None:
+            return len(tokenizer.encode(text, add_special_tokens=False))
+        # Rough fallback: ~0.75 words per token (conservative)
+        return max(1, int(len(text.split()) * 1.33))
 
     def reset(
         self,
@@ -139,11 +128,17 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         **kwargs,
     ) -> ReasonBudgetObservation:
         if seed is not None:
-            self._sampler = EpisodeSampler(seed=seed)
+            self._sampler = EpisodeSampler(
+                seed=seed,
+                prod=self.config.prod,
+                subset_start_idx=self.config.subset_start_idx,
+                subset_size=self.config.subset_size,
+                numina_subset_start_idx=self.config.numina_subset_start_idx,
+                numina_subset_size=self.config.numina_subset_size,
+            )
         self._episode_id = episode_id or str(uuid.uuid4())
         self._questions = self._sampler.sample_episode(
             self.num_questions,
-            self.config.difficulty_mix,
             seed=seed,
         )
         if len(self._questions) < self.num_questions:
@@ -153,17 +148,12 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         self._step_idx = 0
         self._history = []
         self._total_correct = 0
-        encoder = self._get_encoder()
-        texts = [q.text for q in self._questions]
-        self._embeddings = encoder.encode(texts, convert_to_numpy=True)
         obs = _obs_from_internals(
-            embeddings=self._embeddings,
             step_idx=self._step_idx,
             questions=self._questions,
             remaining_budget=self._remaining_budget,
             total_correct=self._total_correct,
             history=self._history,
-            embedding_dim=self.embedding_dim,
         )
         obs.reward = 0.0
         obs.done = False
@@ -175,67 +165,103 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
         timeout_s: Optional[float] = None,
         **kwargs,
     ) -> ReasonBudgetObservation:
+        # Already past all questions
         if self._step_idx >= len(self._questions):
             obs = _obs_from_internals(
-                embeddings=self._embeddings,
                 step_idx=self._step_idx,
                 questions=self._questions,
                 remaining_budget=self._remaining_budget,
                 total_correct=self._total_correct,
                 history=self._history,
-                embedding_dim=self.embedding_dim,
             )
             obs.reward = 0.0
             obs.done = True
             return obs
-        tokens_requested = max(self.min_tokens, min(self.max_tokens, action.token_allocation))
-        spend = min(tokens_requested, self._remaining_budget)
-        if spend < self.min_tokens:
+
+        # In hard-cap mode, terminate if not enough budget remains for a minimum step.
+        if self.config.hard_cap_mode and self._remaining_budget < self.min_tokens:
             obs = _obs_from_internals(
-                embeddings=self._embeddings,
                 step_idx=self._step_idx,
                 questions=self._questions,
                 remaining_budget=self._remaining_budget,
                 total_correct=self._total_correct,
                 history=self._history,
-                embedding_dim=self.embedding_dim,
             )
             obs.reward = 0.0
             obs.done = True
             return obs
+
         question = self._questions[self._step_idx]
-        solver = self._get_solver()
-        if hasattr(solver, "set_question_id"):
-            solver.set_question_id(question.id)
-        result = solver.solve(question.text, question.answer, spend)
-        self._total_correct += 1 if result.was_correct else 0
+
+        # 1. Tokenize the response to count tokens_used
+        tokens_raw = self._count_tokens(action.response)
+        if self.config.hard_cap_mode:
+            tokens_used = min(tokens_raw, max(0, self._remaining_budget))
+        else:
+            tokens_used = tokens_raw
+
+        # 2. Extract and grade the answer
+        predicted = extract_boxed_answer(action.response)
+        was_correct = grade_answer(predicted, question.answer)
+
+        self._total_correct += 1 if was_correct else 0
+
+        # 3. Compute per-step reward
+        step_total_spent = (self.total_budget - self._remaining_budget) + tokens_used
+        overspend_tokens = max(0, step_total_spent - self.total_budget)
         reward = compute_reward(
-            result.was_correct,
-            spend,
+            was_correct,
+            tokens_used,
             self.total_budget,
             self.num_questions,
             beta=self.config.beta,
             gamma=self.config.gamma,
+            overspend_tokens=overspend_tokens,
+            soft_overspend_penalty=self.config.soft_overspend_penalty,
+            hard_cap_mode=self.config.hard_cap_mode,
         )
-        self._remaining_budget -= spend
-        self._history.append({
-            "tokens_allocated": spend,
-            "tokens_used": result.tokens_used,
-            "was_correct": result.was_correct,
-        })
+
+        # 4. Update budget and history
+        self._remaining_budget -= tokens_used
+        if not self.config.soft_allow_negative_budget:
+            self._remaining_budget = max(0, self._remaining_budget)
+        self._history.append(
+            {
+                "tokens_used": tokens_used,
+                "was_correct": was_correct,
+                "question_summary": question.text[:80],
+            }
+        )
         self._step_idx += 1
+
+        # 5. Check termination
         terminated = self._step_idx >= len(self._questions)
-        truncated = self._remaining_budget < self.min_tokens and not terminated
-        if truncated and self._step_idx < len(self._questions):
+        truncated = (
+            self.config.hard_cap_mode
+            and self._remaining_budget < self.min_tokens
+            and not terminated
+        )
+        if truncated:
             terminated = True
+
+        # 6. Episode-level bonus on the final step
+        if terminated:
+            total_spent = self.total_budget - self._remaining_budget
+            reward += compute_episode_bonus(
+                self._total_correct,
+                self.num_questions,
+                total_spent,
+                self.total_budget,
+                lambda_ep=self.config.lambda_ep,
+                target_utilization=self.config.target_utilization,
+            )
+
         obs = _obs_from_internals(
-            embeddings=self._embeddings,
             step_idx=self._step_idx,
             questions=self._questions,
             remaining_budget=self._remaining_budget,
             total_correct=self._total_correct,
             history=self._history,
-            embedding_dim=self.embedding_dim,
         )
         obs.reward = reward
         obs.done = terminated
@@ -244,6 +270,11 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
     @property
     def state(self) -> ReasonBudgetState:
         spent = self.total_budget - self._remaining_budget
+        if self.total_budget > 0:
+            ratio = self._remaining_budget / self.total_budget
+            budget_remaining_ratio = max(0.0, min(1.0, ratio))
+        else:
+            budget_remaining_ratio = 0.0
         return ReasonBudgetState(
             episode_id=self._episode_id,
             step_count=self._step_idx,
@@ -251,10 +282,8 @@ class ReasonBudgetEnvironment(Environment[ReasonBudgetAction, ReasonBudgetObserv
             spent_budget=spent,
             questions_answered=self._step_idx,
             total_correct=self._total_correct,
-            current_accuracy=self._total_correct / self._step_idx if self._step_idx > 0 else 0.0,
-            budget_remaining_ratio=self._remaining_budget / self.total_budget if self.total_budget > 0 else 0.0,
+            current_accuracy=(
+                self._total_correct / self._step_idx if self._step_idx > 0 else 0.0
+            ),
+            budget_remaining_ratio=budget_remaining_ratio,
         )
-
-
-# Backward compatibility alias (deprecated): use ReasonBudgetEnvironment
-ReasonBudgetEnv = ReasonBudgetEnvironment

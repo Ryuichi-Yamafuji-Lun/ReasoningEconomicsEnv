@@ -9,12 +9,14 @@ numpy>=1.24.0
 torch>=2.0.0
 transformers>=4.36.0
 datasets>=2.14.0
-sentence-transformers>=2.2.0
 sympy>=1.12
 pydantic>=2.0.0
 
-# Training / eval / tooling
+# Training (GRPO via TRL + vLLM inference)
+trl>=0.12.0
+vllm>=0.6.0
+
+# Eval / plotting
 matplotlib>=3.7.0
 seaborn>=0.12.0
 tqdm>=4.65.0
-openai>=1.0.0
