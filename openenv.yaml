@@ -1,4 +1,4 @@
-version: "1.0.0""
+version: "1.0.0"
 name: reasoning-economic-env
 description: "RL environment for sequential reasoning budget allocation"
 type: space
