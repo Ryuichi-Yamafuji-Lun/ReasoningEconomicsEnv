@@ -28,7 +28,7 @@ class ReasonBudgetEnvClient(
         """Convert a typed action to the step payload."""
         return {"response": action.response}
 
-    def _parse_result(self, payload: Dict[str, Any]) -> StepResult[ReasonBudgetObservation]:
+    def _parse_result(self, payload: Dict[str, Any]):
         """Parse server step/reset payload to a typed StepResult."""
         obs_data = payload.get("observation")
         if not isinstance(obs_data, dict):
@@ -53,7 +53,7 @@ class ReasonBudgetEnvClient(
             done=done,
         )
 
-    def _parse_state(self, payload: Dict[str, Any]) -> ReasonBudgetState:
+    def _parse_state(self, payload: Dict[str, Any]):
         """Parse server state payload to a typed ReasonBudgetState."""
         state_data = payload.get("state")
         if not isinstance(state_data, dict):

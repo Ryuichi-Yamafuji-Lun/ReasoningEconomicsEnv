@@ -42,16 +42,19 @@ def _obs_from_internals(
     remaining_budget: int,
     total_correct: int,
     history: list,
+    config: EnvConfig,
 ) -> ReasonBudgetObservation:
     """Build an observation dict from internal episode state."""
     if step_idx >= len(questions):
         q_rem = 0
         budget_per = 0.0
         question_text = ""
+        problem_type = None
     else:
         q_rem = len(questions) - step_idx
         budget_per = remaining_budget / q_rem if q_rem > 0 else 0.0
         question_text = questions[step_idx].text
+        problem_type = getattr(questions[step_idx], "problem_type", None)
     acc = total_correct / step_idx if step_idx > 0 else 0.0
     return ReasonBudgetObservation(
         remaining_budget=float(remaining_budget),
@@ -63,6 +66,13 @@ def _obs_from_internals(
         history=list(history),
         done=False,
         reward=None,
+        metadata={
+            "problem_type": problem_type,
+            "min_tokens": config.min_tokens,
+            "max_tokens": config.max_tokens,
+            "num_questions": len(questions),
+            "budget_ratio": config.budget_ratio,
+        },
     )
 
 
@@ -154,6 +164,7 @@ class ReasonBudgetEnvironment(
             remaining_budget=self._remaining_budget,
             total_correct=self._total_correct,
             history=self._history,
+            config=self.config,
         )
         obs.reward = 0.0
         obs.done = False
@@ -173,6 +184,7 @@ class ReasonBudgetEnvironment(
                 remaining_budget=self._remaining_budget,
                 total_correct=self._total_correct,
                 history=self._history,
+                config=self.config,
             )
             obs.reward = 0.0
             obs.done = True
@@ -186,6 +198,7 @@ class ReasonBudgetEnvironment(
                 remaining_budget=self._remaining_budget,
                 total_correct=self._total_correct,
                 history=self._history,
+                config=self.config,
             )
             obs.reward = 0.0
             obs.done = True
@@ -262,6 +275,7 @@ class ReasonBudgetEnvironment(
             remaining_budget=self._remaining_budget,
             total_correct=self._total_correct,
             history=self._history,
+            config=self.config,
         )
         obs.reward = reward
         obs.done = terminated
