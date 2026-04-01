@@ -22,6 +22,7 @@ if create_app is not None:
         ReasonBudgetAction,
         ReasonBudgetObservation,
         env_name="reasoning-economic-env",
+        max_concurrent_envs=64,
     )
 else:
     from fastapi import FastAPI

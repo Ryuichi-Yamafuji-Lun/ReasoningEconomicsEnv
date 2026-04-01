@@ -2,7 +2,7 @@
 
 v2: The environment is a grader, not a solver-wrapper. It receives the LLM's
 text output, tokenizes it, extracts and grades the answer, and returns rewards.
-The LLM call happens in rollout_func, not here.
+The LLM generation is driven by the trainer (via environment_factory).
 """
 
 import uuid
@@ -43,7 +43,7 @@ def _obs_from_internals(
     total_correct: int,
     history: list,
     config: EnvConfig,
-) -> ReasonBudgetObservation:
+):
     """Build an observation dict from internal episode state."""
     if step_idx >= len(questions):
         q_rem = 0
@@ -85,6 +85,10 @@ class ReasonBudgetEnvironment(
     count tokens_used, extracts and grades the answer, and returns per-step
     rewards plus an episode-level bonus on the final step.
     """
+
+    # Required by openenv HTTPEnvServer when create_app(..., max_concurrent_envs>1):
+    # validation uses getattr(env_cls, "SUPPORTS_CONCURRENT_SESSIONS", False).
+    SUPPORTS_CONCURRENT_SESSIONS: bool = True
 
     def __init__(self, config: Optional[EnvConfig] = None, **kwargs):
         super().__init__(**kwargs)
@@ -136,7 +140,7 @@ class ReasonBudgetEnvironment(
         seed: Optional[int] = None,
         episode_id: Optional[str] = None,
         **kwargs,
-    ) -> ReasonBudgetObservation:
+    ):
         if seed is not None:
             self._sampler = EpisodeSampler(
                 seed=seed,
@@ -175,7 +179,7 @@ class ReasonBudgetEnvironment(
         action: ReasonBudgetAction,
         timeout_s: Optional[float] = None,
         **kwargs,
-    ) -> ReasonBudgetObservation:
+    ):
         # Already past all questions
         if self._step_idx >= len(self._questions):
             obs = _obs_from_internals(
@@ -282,7 +286,7 @@ class ReasonBudgetEnvironment(
         return obs
 
     @property
-    def state(self) -> ReasonBudgetState:
+    def state(self):
         spent = self.total_budget - self._remaining_budget
         if self.total_budget > 0:
             ratio = self._remaining_budget / self.total_budget
