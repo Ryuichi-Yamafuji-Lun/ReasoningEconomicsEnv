@@ -26,7 +26,10 @@ class ReasonBudgetEnvClient(
 
     def _step_payload(self, action: ReasonBudgetAction) -> Dict[str, Any]:
         """Convert a typed action to the step payload."""
-        return {"response": action.response}
+        payload: Dict[str, Any] = {"response": action.response}
+        if action.metadata:
+            payload["metadata"] = dict(action.metadata)
+        return payload
 
     def _parse_result(self, payload: Dict[str, Any]):
         """Parse server step/reset payload to a typed StepResult."""

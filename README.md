@@ -72,7 +72,26 @@ uvicorn server.app:app --host 0.0.0.0 --port 8000
 
 ## Environment Contract
 
-**Action**: `ReasonBudgetAction(response=str)` -- the LLM's full text output (reasoning trace + answer).
+**Action**: `ReasonBudgetAction(response=str)` -- the LLM's full text output (reasoning trace + answer). Optional `metadata` may include `tokenizer_name` (a Hugging Face model id). When set, the server uses `AutoTokenizer.from_pretrained` for that id to count tokens on that step (and updates the session tokenizer if it changed).
+
+**Reset (OpenEnv / WebSocket)**: Besides `seed` and `episode_id`, clients may pass:
+- **`tokenizer_name`** (string, Hugging Face model id) — aligns both the episode budget cap **and** per-step token counting to the policy tokenizer (see Total episode budget below).
+- **`total_budget`** (int, optional) — explicit override for the episode budget cap; skips all automatic computation.
+
+**Total episode budget**: The `total_budget` for an episode is resolved with the following priority on each `reset`:
+
+| Priority | Condition | Formula | `budget_source` in obs metadata |
+|----------|-----------|---------|--------------------------------|
+| 1 — Client override | `total_budget` passed on reset | exact integer from client | `"client"` |
+| 2 — Tokenizer-native *(default for training)* | `tokenizer_name` passed on reset | `budget_ratio × Σ tokenize(question_i.text)` over the **10 sampled questions** | `"tokenizer_native"` |
+| 2b — Tokenizer load failure | `tokenizer_name` passed but server cannot load it | falls back to config formula (warns) | `"config"` |
+| 3 — Config fallback | neither `tokenizer_name` nor `total_budget` passed (warns) | `budget_ratio × num_questions × (min_tokens + max_tokens) / 2` | `"config"` |
+
+Under **tokenizer-native** (the normal training path), after sampling the 10 questions for the episode the server tokenizes each question’s text with `AutoTokenizer.from_pretrained(tokenizer_name)` and sets `total_budget = int(budget_ratio × total_question_tokens)`. Both the cap **and** per-step spend are then measured in the same policy-tokenizer units.
+
+The resolved `total_budget` and `budget_source` are returned in `obs.metadata` of the reset observation so clients can verify which path was taken.
+
+**Server requirement**: The env host (Docker, HF Space, etc.) must be able to download and cache tokenizers from the Hub for any `tokenizer_name` you send (network access on first use).
 
 **Observation**: question text, remaining budget, questions remaining, budget per remaining question, accuracy so far, episode history, done, reward.
 
@@ -101,10 +120,30 @@ Configure in `env/config.py`:
 
 ## Docker
 
+Build context is the **repo root** (`ReasoningEconomicsEnv/`).
+
 ```bash
 docker build -f server/Dockerfile -t reasoning-economic-env .
-docker run -p 8000:8000 reasoning-economic-env
+docker run --rm -p 8000:8000 reasoning-economic-env
+docker run -d --name ree-env -p 8000:8000 reasoning-economic-env # detached container to continue using shell
 ```
+
+**Build logs:** The Dockerfile prints `BASE_IMAGE` and a JSON dump of default `EnvConfig` (including `tokenizer_name`, budget fields) in the **builder** and **final** stages. **Container logs:** On start, the entrypoint prints `REE_*` env vars and the **effective** `EnvConfig` after `REE_DEFAULT_TOKENIZER_NAME` / `REE_PROD` (optional).
+
+**Remote H100 (or any GPU host) — run env beside training:** The OpenEnv server is CPU-only (tokenizer + grading); no GPU flag is required for this container.
+
+```bash
+# On the H100 machine (from this directory)
+docker build -f server/Dockerfile -t ree-env:latest .
+
+# Optional: set default Hub tokenizer if clients omit reset tokenizer_name
+docker run --rm -d --name ree-env -p 8000:8000 \
+  -e REE_DEFAULT_TOKENIZER_NAME="Qwen/Qwen3-4B" \
+  -v "${HOME}/.cache/huggingface:/root/.cache/huggingface" \
+  ree-env:latest
+```
+
+Point **ReasoningEconomicsPT** at `http://<host>:8000` (`--env_base_url` or `http://127.0.0.1:8000` if co-located). Ensure the host can reach Hugging Face to download tokenizers the first time (or pre-populate the cache volume).
 
 ## OpenEnv
 

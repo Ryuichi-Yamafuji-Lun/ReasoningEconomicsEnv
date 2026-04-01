@@ -3,6 +3,7 @@
 
 ARG BASE_IMAGE=ghcr.io/meta-pytorch/openenv-base:latest
 FROM ${BASE_IMAGE} AS builder
+ARG BASE_IMAGE
 
 WORKDIR /app
 
@@ -38,18 +39,39 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-editable; \
     fi
 
+RUN echo "=== ReasoningEconomicsEnv Docker build (builder) ===" && \
+    echo "BASE_IMAGE=${BASE_IMAGE}" && \
+    cd /app/env && uv run python -c "\
+from dataclasses import asdict; \
+import json; \
+from env.config import EnvConfig; \
+print('EnvConfig defaults from repo (baked into image):'); \
+print(json.dumps(asdict(EnvConfig()), indent=2))"
+
 # Final runtime stage
 FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
 
 WORKDIR /app
 
 COPY --from=builder /app/env/.venv /app/.venv
 COPY --from=builder /app/env /app/env
+COPY server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
+RUN echo "=== ReasoningEconomicsEnv Docker build (final) ===" && \
+    echo "BASE_IMAGE=${BASE_IMAGE}" && \
+    cd /app/env && python -c "\
+from dataclasses import asdict; \
+import json; \
+from env.config import EnvConfig; \
+print('EnvConfig defaults (final image):'); \
+print(json.dumps(asdict(EnvConfig()), indent=2))"
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 8000"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

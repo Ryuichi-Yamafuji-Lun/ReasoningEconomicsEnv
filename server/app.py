@@ -1,7 +1,7 @@
 """FastAPI app exposing ReasoningEconomicsEnv environment via OpenEnv create_app."""
 
 # from env import EnvConfig, ReasonBudgetEnvironment
-from env.config import EnvConfig
+from env.config import env_config_for_server
 from env.reason_budget_env import ReasonBudgetEnvironment
 from env.models import ReasonBudgetAction, ReasonBudgetObservation
 
@@ -13,7 +13,7 @@ except ImportError:
 
 def _env_factory():
     """Factory that returns a new ReasonBudgetEnvironment instance (for each WebSocket session)."""
-    return ReasonBudgetEnvironment(config=EnvConfig())
+    return ReasonBudgetEnvironment(config=env_config_for_server())
 
 
 if create_app is not None:
@@ -22,6 +22,7 @@ if create_app is not None:
         ReasonBudgetAction,
         ReasonBudgetObservation,
         env_name="reasoning-economic-env",
+        max_concurrent_envs=64,
     )
 else:
     from fastapi import FastAPI
