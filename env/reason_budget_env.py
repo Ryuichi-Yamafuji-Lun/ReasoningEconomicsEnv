@@ -182,8 +182,11 @@ class ReasonBudgetEnvironment(
         total_budget: Optional[int] = None,
         **kwargs,
     ):
+<<<<<<< HEAD
         tokenizer_name = tokenizer_name or kwargs.pop("tokenizer_name", None)
         total_budget = total_budget or kwargs.pop("total_budget", None)
+=======
+>>>>>>> origin/main
         if seed is not None:
             self._sampler = EpisodeSampler(
                 seed=seed,
