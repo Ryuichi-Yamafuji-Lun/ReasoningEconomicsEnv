@@ -116,13 +116,14 @@ class ReasonBudgetEnvironment(
         self._remaining_budget: int = 0
         self._history: list[dict] = []
         self._total_correct: int = 0
+        self._budget_source: str = "config"
 
-    def _resolved_tokenizer_name(self) -> str:
+    def _resolved_tokenizer_name(self):
         if self._active_tokenizer_name:
             return self._active_tokenizer_name
         return self.config.tokenizer_name
 
-    def _invalidate_tokenizer_cache(self) -> None:
+    def _invalidate_tokenizer_cache(self):
         self._tokenizer = None
         self._tokenizer_cache_key = None
 
@@ -143,7 +144,7 @@ class ReasonBudgetEnvironment(
             self._tokenizer_cache_key = None
         return self._tokenizer
 
-    def _count_tokens(self, text: str) -> int:
+    def _count_tokens(self, text: str):
         """Count tokens in text using the LLM's tokenizer, or approximate by whitespace."""
         tokenizer = self._get_tokenizer()
         if tokenizer is not None:
@@ -151,7 +152,7 @@ class ReasonBudgetEnvironment(
         # Rough fallback: ~0.75 words per token (conservative)
         return max(1, int(len(text.split()) * 1.33))
 
-    def _compute_tokenizer_native_budget(self, questions: list[Question]) -> int:
+    def _compute_tokenizer_native_budget(self, questions: list[Question]):
         """Compute total budget by tokenizing the actual episode questions.
 
         Budget = budget_ratio * sum(token_count(question_i.text)) for all sampled
@@ -182,11 +183,8 @@ class ReasonBudgetEnvironment(
         total_budget: Optional[int] = None,
         **kwargs,
     ):
-<<<<<<< HEAD
         tokenizer_name = tokenizer_name or kwargs.pop("tokenizer_name", None)
         total_budget = total_budget or kwargs.pop("total_budget", None)
-=======
->>>>>>> origin/main
         if seed is not None:
             self._sampler = EpisodeSampler(
                 seed=seed,
