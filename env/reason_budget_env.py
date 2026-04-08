@@ -298,8 +298,14 @@ class ReasonBudgetEnvironment(
         else:
             tokens_used = tokens_raw
 
-        # 2. Extract and grade the answer
-        predicted = extract_boxed_answer(action.response)
+        # 2. Extract and grade the answer (optional visible-only tail for hybrid think models)
+        grading_extra = md.get("grading_response")
+        grading_text = (
+            grading_extra.strip()
+            if isinstance(grading_extra, str) and grading_extra.strip()
+            else action.response
+        )
+        predicted = extract_boxed_answer(grading_text)
         was_correct = grade_answer(predicted, question.answer)
 
         self._total_correct += 1 if was_correct else 0

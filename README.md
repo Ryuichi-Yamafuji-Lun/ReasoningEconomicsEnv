@@ -72,7 +72,9 @@ uvicorn server.app:app --host 0.0.0.0 --port 8000
 
 ## Environment Contract
 
-**Action**: `ReasonBudgetAction(response=str)` -- the LLM's full text output (reasoning trace + answer). Optional `metadata` may include `tokenizer_name` (a Hugging Face model id). When set, the server uses `AutoTokenizer.from_pretrained` for that id to count tokens on that step (and updates the session tokenizer if it changed).
+**Action**: `ReasonBudgetAction(response=str)` -- the LLM's full text output (reasoning trace + answer). Optional `metadata` may include:
+- **`tokenizer_name`** (Hugging Face model id) — when set, the server uses `AutoTokenizer.from_pretrained` for that id to count tokens on that step (and updates the session tokenizer if it changed).
+- **`grading_response`** (string, optional) — if non-empty, used **only** for `\\boxed{}` extraction and answer grading. Token budgeting always uses `response` in full. Use this when the policy emits hybrid internal reasoning before the final answer (e.g. Qwen3 family) so a spurious `\\boxed{}` inside the reasoning span does not affect grading.
 
 **Reset (OpenEnv / WebSocket)**: Besides `seed` and `episode_id`, clients may pass:
 - **`tokenizer_name`** (string, Hugging Face model id) — aligns both the episode budget cap **and** per-step token counting to the policy tokenizer (see Total episode budget below).
